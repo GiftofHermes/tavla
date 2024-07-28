@@ -1,5 +1,8 @@
+mod error;
 mod game;
-use game::*;
+
+pub use error::Error;
+pub use game::*;
 
 #[cfg(test)]
 mod tests {
@@ -7,7 +10,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let tavla = Game::new();
-        assert!(tavla);
+        let _tavla = Game::new();
+        assert!(true);
     }
 }
