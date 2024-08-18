@@ -1,16 +1,9 @@
+mod board;
 mod error;
 mod game;
+mod player;
 
+pub(crate) use board::{Board, Point};
 pub use error::Error;
 pub use game::*;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let _tavla = Game::new();
-        assert!(true);
-    }
-}
+pub(crate) use player::Player;
