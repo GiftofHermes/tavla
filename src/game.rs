@@ -7,6 +7,26 @@ use rand::Rng;
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Die(u8);
 
+impl TryFrom<u8> for Die {
+    type Error = crate::Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl Into<u8> for Die {
+    fn into(self) -> u8 {
+        self.0
+    }
+}
+
+impl Into<usize> for Die {
+    fn into(self) -> usize {
+        self.0.into()
+    }
+}
+
 impl Die {
     fn new(n: u8) -> Result<Self, Error> {
         if (1..=6).contains(&n) {
@@ -53,11 +73,11 @@ pub struct Game {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Move {
     from: usize,
-    to: usize,
+    die: Die,
 }
 impl Move {
-    fn new(from: usize, to: usize) -> Self {
-        Self { from, to }
+    fn new(from: usize, die: Die) -> Self {
+        Self { from, die }
     }
 }
 
@@ -75,22 +95,28 @@ impl Game {
         self.dice = Some(Dice::roll());
     }
 
+    fn can_collect(&self) -> bool {
+        let player = self.player_turn;
+
+        match player {
+            Player::White => {}
+            Player::Black => {}
+        }
+    }
+
     pub fn valid_movements(&self) -> Vec<Move> {
         let mut movements = Vec::new();
         if let Some(dice) = self.dice {
             let dice_values = dice.values();
+            let point_on_bar = self.board.bar[self.player_turn as usize];
+
             for from in 0..24 {
                 if let Point::Occupied(player, _) = self.board.points[from] {
                     if player == self.player_turn {
                         for &die_value in &dice_values {
-                            let to = match self.player_turn {
-                                Player::White => from + die_value as usize,
-                                Player::Black => from.saturating_sub(die_value as usize),
-                            };
-
-                            let movement = Move::new(from, to);
-                            if to < 24 && self.is_valid_movement(movement) {
-                                movements.push(Move { from, to });
+                            let movement = Move::new(from, Die::try_from(die_value).expect("Because we are creating a die from a die value this should always be a valid operation"));
+                            if self.is_valid_movement(&movement) {
+                                movements.push(movement);
                             }
                         }
                     }
@@ -100,8 +126,20 @@ impl Game {
         movements
     }
 
-    fn is_valid_movement(&self, movement: Move) -> bool {
-        let to = movement.to;
+    fn is_valid_movement(&self, movement: &Move) -> bool {
+        let from = movement.from;
+        let die_value: usize = movement.die.into();
+        let to: usize = if self.board.bar[self.player_turn as usize] != 0 {
+            match self.player_turn {
+                Player::White => die_value - 1,
+                Player::Black => 24 - die_value,
+            }
+        } else {
+            match self.player_turn {
+                Player::White => from + die_value,
+                Player::Black => from.saturating_sub(die_value),
+            }
+        };
         match self.board.points[to] {
             Point::Empty => true,
             Point::Occupied(player, count) => player == self.player_turn || count == 1,
@@ -145,6 +183,13 @@ impl Game {
                     }
                 }
 
+                let status = match (self.check_win(), player) {
+                    (true, Player::White) => GameStatus::WhiteWin,
+                    (true, Player::Black) => GameStatus::BlackWin,
+                    (false, _) => GameStatus::InProgress,
+                };
+                self.status = status;
+
                 Ok(())
             }
             _ => Err(Error::InvalidMove),
@@ -159,7 +204,7 @@ impl Game {
         self.dice = None;
     }
 
-    pub fn check_win(&self) -> bool {
+    fn check_win(&self) -> bool {
         self.board
             .points
             .iter()
